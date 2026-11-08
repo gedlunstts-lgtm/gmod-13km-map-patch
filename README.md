@@ -39,8 +39,19 @@ Hammer, and run it.
 gmod483k.exe              install
 gmod483k.exe -verify      report what is currently installed
 gmod483k.exe -restore     put the original files back
+gmod483k.exe -maps        install only the maps, leave the game files alone
 gmod483k.exe -gmod "D:\SteamLibrary\steamapps\common\GarrysMod"
 ```
+
+Double-clicking it works: the window stays open until you press Enter.
+
+### Maps
+
+If a `maps` folder or a `maps.zip` containing `.bsp` files sits next to the
+patcher, it copies them into the game after patching, skipping any that are
+already there unchanged. Maps are kept beside the patcher rather than inside
+it so that someone who only wants the patch is not made to download tens of
+megabytes of them.
 
 It finds the game through Steam's library list, keeps every original beside
 the patched one as `<name>.stock`, and verifies each file both before and

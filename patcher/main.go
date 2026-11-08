@@ -24,7 +24,7 @@ import (
 //go:embed patches/*.glp
 var patchFS embed.FS
 
-const version = "1.1"
+const version = "1.2"
 
 type state int
 
@@ -290,25 +290,32 @@ func restore(items []item) int {
 }
 
 func main() {
+	code := run()
+	waitIfOwnConsole()
+	os.Exit(code)
+}
+
+func run() int {
 	var (
-		gmod    = flag.String("gmod", "", "path to the GarrysMod folder (found automatically if omitted)")
-		doRest  = flag.Bool("restore", false, "put the original files back")
-		doVer   = flag.Bool("verify", false, "only report what is currently installed")
-		doList  = flag.Bool("list", false, "list the game builds this patcher has a patch for")
-		showVer = flag.Bool("version", false, "print version and exit")
+		gmod     = flag.String("gmod", "", "path to the GarrysMod folder (found automatically if omitted)")
+		doRest   = flag.Bool("restore", false, "put the original files back")
+		doVer    = flag.Bool("verify", false, "only report what is currently installed")
+		doList   = flag.Bool("list", false, "list the game builds this patcher has a patch for")
+		showVer  = flag.Bool("version", false, "print version and exit")
+		onlyMaps = flag.Bool("maps", false, "only install the maps found next to the patcher, do not touch the game files")
 	)
 	flag.Parse()
 
 	if *showVer {
 		fmt.Printf("gmod483k %s\n", version)
-		return
+		return 0
 	}
 	fmt.Printf("gmod483k %s - big map patch for Garry's Mod\n", version)
 
 	rels, err := loadReleases()
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return 1
 	}
 	if *doList {
 		fmt.Println()
@@ -319,7 +326,7 @@ func main() {
 				fmt.Printf("      %-28s %x\n", t.Path, t.OldHash[:8])
 			}
 		}
-		return
+		return 0
 	}
 
 	root := *gmod
@@ -330,19 +337,32 @@ func main() {
 		fmt.Println()
 		fmt.Println("Could not find Garry's Mod. Pass the folder explicitly, for example:")
 		fmt.Println(`  gmod483k -gmod "D:\SteamLibrary\steamapps\common\GarrysMod"`)
-		os.Exit(1)
+		return 1
 	}
 	if _, err := os.Stat(filepath.Join(root, "garrysmod", "gameinfo.txt")); err != nil {
 		fmt.Printf("\n%s does not look like a GarrysMod folder.\n", root)
-		os.Exit(1)
+		return 1
 	}
 	fmt.Println("game: ", root)
+
+	maps, mapsFrom := findMaps()
+	if *onlyMaps {
+		if len(maps) == 0 {
+			fmt.Println()
+			fmt.Println("No maps found next to the patcher. Put a 'maps' folder or a")
+			fmt.Println("'maps.zip' containing .bsp files in the same directory as this")
+			fmt.Println("program, then run it again.")
+			return 1
+		}
+		fmt.Println()
+		return installMaps(root, maps, mapsFrom)
+	}
 
 	rel, items, ok := pick(root, rels)
 	if !ok {
 		report(items)
 		explainUnsupported(root, rels, items)
-		os.Exit(1)
+		return 1
 	}
 	fmt.Println("patch:", rel.patch.Note)
 	report(items)
@@ -367,8 +387,15 @@ func main() {
 			fmt.Println("Mixed state. Run -restore, then install again.")
 		}
 	case *doRest:
-		os.Exit(restore(items))
+		return restore(items)
 	default:
-		os.Exit(install(items))
+		if code := install(items); code != 0 {
+			return code
+		}
+		if len(maps) > 0 {
+			fmt.Println()
+			return installMaps(root, maps, mapsFrom)
+		}
 	}
+	return 0
 }
