@@ -1,0 +1,30 @@
+{
+  "note": "GMod 483k + raised limits, build 2026-11-04",
+  "files": [
+    {
+      "target": "bin/win64/engine.dll",
+      "stock": "./ref/nov04/engine.dll",
+      "patched": "./out/engine.dll"
+    },
+    {
+      "target": "bin/win64/client.dll",
+      "stock": "./ref/nov04/client.dll",
+      "patched": "./out/client.dll"
+    },
+    {
+      "target": "bin/win64/server.dll",
+      "stock": "./ref/nov04/server.dll",
+      "patched": "./out/server.dll"
+    },
+    {
+      "target": "bin/win64/shaderapidx9.dll",
+      "stock": "./ref/nov04/shaderapidx9.dll",
+      "patched": "./out/shaderapidx9.dll"
+    },
+    {
+      "target": "bin/win64/studiorender.dll",
+      "stock": "./ref/nov04/studiorender.dll",
+      "patched": "./out/studiorender.dll"
+    }
+  ]
+}

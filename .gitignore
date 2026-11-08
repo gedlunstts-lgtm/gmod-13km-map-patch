@@ -1,0 +1,21 @@
+# NEVER commit game files. This project distributes its own bytes only;
+# a stray DLL in the history is the one thing that breaks that.
+*.dll
+*.exe
+*.bsp
+*.vpk
+*.mdmp
+
+# local reference copies used when porting
+ref/
+out/
+fakegmod/
+
+# build output
+/gmod483k.exe
+/gmod483k
+
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
