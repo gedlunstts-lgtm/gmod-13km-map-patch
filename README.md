@@ -61,6 +61,12 @@ writes nothing at all - not even the files that did match.
 
 ### Before you install
 
+**This lets you play large maps, not build them.** The map compilers and
+Hammer++ need their own byte-level patches, and those are not done yet — the
+compilers currently in use are built on a third-party binary rather than on
+the game's own files, which is not something that can be distributed the way
+this patch is. That work is planned.
+
 **This patch targets exact game builds.** The patcher carries one patch per
 supported build and picks the one matching your files; if none does, it writes
 nothing and prints the hashes it found. A Garry's Mod update means a port is
