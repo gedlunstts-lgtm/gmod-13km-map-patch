@@ -24,7 +24,7 @@ import (
 //go:embed patches/*.glp
 var patchFS embed.FS
 
-const version = "1.2"
+const version = "1.4"
 
 type state int
 
@@ -196,25 +196,65 @@ func writeFile(path string, data []byte) error {
 func install(items []item) int {
 	for _, it := range items {
 		b, err := os.ReadFile(it.bak)
-		if err == nil && hashOf(b) != it.t.OldHash {
-			fmt.Printf("%s: the existing backup is not the original. Stopping, nothing changed.\n",
-				filepath.Base(it.bak))
+		if err != nil || hashOf(b) == it.t.OldHash {
+			continue
+		}
+		// The backup does not hold this build's original. That is the normal
+		// state after a game update: the backup is simply left over from the
+		// previous build. If the live file is this build's untouched original
+		// we can refresh the backup from it, which is done below. Anything
+		// else means we cannot tell what the original was, so we stop.
+		if it.st == stPatched {
+			// Already patched, so there is nothing to install for this file
+			// and nothing to lose by carrying on. The backup is stale, which
+			// only matters when it comes time to undo or to re-port.
+			continue
+		}
+		if it.st != stStock {
+			fmt.Printf("%s: the existing backup is not the original, and %s is not this build's\n",
+				filepath.Base(it.bak), filepath.Base(it.live))
+			fmt.Println("untouched original either. Stopping, nothing changed.")
 			fmt.Println("Verify the game files through Steam, then run this again.")
 			return 1
 		}
 	}
 	done := 0
+	var noBackup []string
 	for i := range items {
 		it := &items[i]
 		name := filepath.Base(it.live)
 		if it.st == stPatched {
-			fmt.Printf("  %-22s already patched, skipped\n", name)
+			b, err := os.ReadFile(it.bak)
+			switch {
+			case err != nil:
+				fmt.Printf("  %-22s already patched, but there is no %s\n",
+					name, filepath.Base(it.bak))
+				noBackup = append(noBackup, name)
+			case hashOf(b) != it.t.OldHash:
+				fmt.Printf("  %-22s already patched, but %s is from an earlier build\n",
+					name, filepath.Base(it.bak))
+				noBackup = append(noBackup, name)
+			default:
+				fmt.Printf("  %-22s already patched, skipped\n", name)
+			}
 			continue
 		}
-		if _, err := os.Stat(it.bak); os.IsNotExist(err) {
+		// Save the original, or refresh a backup left over from an earlier
+		// build. Reaching here with a stale backup means the pre-check above
+		// confirmed the live file is this build's untouched original.
+		stale := false
+		if b, err := os.ReadFile(it.bak); err != nil {
+			stale = false
+		} else if hashOf(b) != it.t.OldHash {
+			stale = true
+		}
+		if _, err := os.Stat(it.bak); os.IsNotExist(err) || stale {
 			if err := writeFile(it.bak, it.bytes); err != nil {
 				fmt.Printf("  %-22s could not save the backup: %v\n", name, err)
 				return 1
+			}
+			if stale {
+				fmt.Printf("  %-22s backup was from an earlier build, refreshed\n", name)
 			}
 		}
 		out, err := it.t.Apply(it.bytes)
@@ -236,6 +276,21 @@ func install(items []item) int {
 	}
 	fmt.Println()
 	fmt.Printf("Done: %d file(s) patched.\n", done)
+	if len(noBackup) > 0 {
+		fmt.Println()
+		fmt.Printf("WARNING: %d file(s) are patched with no saved original:\n", len(noBackup))
+		for _, n := range noBackup {
+			fmt.Printf("    %s\n", n)
+		}
+		fmt.Println("This patch stores only the bytes it changes - the original bytes are")
+		fmt.Println("deliberately not in it - so it cannot be undone from itself. With the")
+		fmt.Println("backup gone, the way back is Steam: right-click Garry's Mod, Properties,")
+		fmt.Println("Installed Files, Verify integrity of game files. Then run this again and")
+		fmt.Println("the originals will be saved properly.")
+		fmt.Println()
+		fmt.Println("If you installed with something else that kept its own backups under")
+		fmt.Println("different names, restoring with that tool first works too.")
+	}
 	fmt.Println()
 	fmt.Println("Worth knowing:")
 	fmt.Println("  - Keep the .stock files. They are the original game files, and they are")

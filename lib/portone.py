@@ -245,6 +245,32 @@ def port_one(old_unp, old_pat, stock, out=None, verbose=True):
 
     if fails:
         return None, fails
+
+    # --- final gate: where does everything point? ---------------------------
+    # Checked against the two stock files only, using nothing the port itself
+    # relied on. A port that forgot to move a reference, or moved it to the
+    # wrong place, does not get written out.
+    import tempfile, os
+    from verify_refs import verify_exits, verify_text_refs
+    fd, tmp = tempfile.mkstemp(suffix='.dll')
+    os.write(fd, bytes(d)); os.close(fd)
+    try:
+        NS, NP = PE(stock), PE(tmp)
+        if verbose:
+            print('  verification:')
+        _, bad = verify_exits(OLD, PAT, NS, NP, verbose=verbose)
+        for a, w in bad:
+            fails.append((a, 'verify: ' + w))
+        _, lost, extra = verify_text_refs(OLD, PAT, NS, NP, verbose=verbose)
+        for k, c in lost:
+            fails.append((0, 'verify: reference lost x%d %s' % (c, k)))
+        for k, c in extra:
+            fails.append((0, 'verify: unexpected reference x%d %s' % (c, k)))
+    finally:
+        os.unlink(tmp)
+    if fails:
+        return None, fails
+
     if out:
         open(out, 'wb').write(bytes(d))
     return bytes(d), []

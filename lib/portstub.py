@@ -4,12 +4,59 @@ iz NEPATCHENNOGO starogo fajla."""
 import sys, struct, bisect, hashlib, tempfile, os
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from capstone import *
+from capstone.x86 import *
 from pe import PE
 from sigport import mask_sig, find
 from pediff import diff
 import addsec as A
 
 WINS=((48,0),(80,0),(128,0),(200,0),(320,0))
+
+# --- sverka koda mezhdu sborkami ------------------------------------------
+# Pri pereezde koda objazany menjatsja tolko pozicionnye polja: rip-otnositelnoe
+# smeshchenie i rel8/rel32 u vetvlenij. Vsjo ostalnoe - v tom chisle immediate-
+# konstanty, kotorye my i pravim (cmp ebx, 0x10000) - dolzhno sovpadat' bajt v
+# bajt, inache eto drugoj kod i portirovat' ego vslepuju nelzja.
+def _relfields(x):
+    out = []
+    e = x.encoding
+    for op in x.operands:
+        if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
+            if e.disp_size:
+                out.append((e.disp_offset, e.disp_size))
+            break
+    if X86_GRP_BRANCH_RELATIVE in x.groups and e.imm_size:
+        out.append((e.imm_offset, e.imm_size))
+    return out
+
+
+def code_equiv(ca, cb, va_a, va_b, md):
+    """Odin li eto kod s tochnostju do pozicionnyh smeshchenij.
+       Vozvrashchaet (bool, prichina)."""
+    if ca == cb:
+        return True, None
+    ia = list(md.disasm(ca, va_a))
+    ib = list(md.disasm(cb, va_b))
+    if len(ia) != len(ib):
+        return False, 'raznoe chislo instrukcij: %d vs %d' % (len(ia), len(ib))
+    off = 0
+    for x, y in zip(ia, ib):
+        if x.size != y.size or x.mnemonic != y.mnemonic:
+            return False, '+%d: %s %s  vs  %s %s' % (off, x.mnemonic, x.op_str,
+                                                     y.mnemonic, y.op_str)
+        if bytes(x.bytes) != bytes(y.bytes):
+            ok = bytearray(x.size)
+            for fo, fs in _relfields(x):
+                for t in range(fs):
+                    ok[fo + t] = 1
+            for k in range(x.size):
+                if x.bytes[k] != y.bytes[k] and not ok[k]:
+                    return False, '+%d bajt %d: %s %s  vs  %s %s' % (
+                        off, k, x.mnemonic, x.op_str, y.mnemonic, y.op_str)
+        off += x.size
+    return True, None
+
 
 def fstart(P, va):
     i=bisect.bisect_right(P.fstarts,va-P.base)-1
@@ -220,9 +267,16 @@ def port_file(old_unp, old_pat, stock, out_path, secnames=('.ctext','.cdata'), v
         if e.disp_size and 'rip' in ins.op_str:
             dd=int.from_bytes(ins.bytes[e.disp_offset:e.disp_offset+e.disp_size],'little',signed=True)
             t=ins.address+ins.size+dd; fo,fs=e.disp_offset,e.disp_size
-        elif ins.mnemonic in ('jmp','call') and ins.op_str.startswith('0x'):
+        elif ins.op_str.startswith('0x') and (ins.mnemonic=='call' or ins.mnemonic[0]=='j'
+                                              or ins.mnemonic.startswith('loop')):
+            # Ljuboj otnositelnyj perehod, a ne tolko jmp/call: uslovnyj vyhod
+            # iz zaglushki (jl, jne ...) tak zhe smotrit v .text i tak zhe
+            # obyazan pereehat. Na toj zhe sborke sdvig nulevoj i propusk ne
+            # viden - poetomu on dozhil do pervogo nastojashchego porta.
             t=int(ins.op_str,16); fo,fs=e.imm_offset,e.imm_size; rel=True
         if t is None or inside(t): continue
+        if rel and fs!=4:
+            fails.append((ins.address,'%s naruzhu s rel%d - ne perekodirovat'%(ins.mnemonic,fs*8))); continue
         sec=PAT.sec_of_rva(t-PAT.base); snm=sec['name'] if sec else None
         if snm=='.text':
             f=fstart(OLD,t)
@@ -295,8 +349,9 @@ def apply_tramps(OLD, PAT, NEW, d, runs, newsec, D, verbose=True):
         if nsite is None: fails.append((site,'sajt ne najden')); continue
         o=NEW.va2o(nsite)
         cur=bytes(d[o:o+L]); want=OLD.read(site,L)
-        if cur!=want:
-            fails.append((site,'bajty ne stokovye: %s vs %s'%(cur.hex(),want.hex()))); continue
+        same,why=code_equiv(want,cur,site,nsite,OLD.md)
+        if not same:
+            fails.append((site,'bajty ne stokovye (%s): %s vs %s'%(why,cur.hex(),want.hex()))); continue
         tgt=stub+D
         op=b'\xe8' if kind=='call' else b'\xe9'
         d[o:o+L]=op+struct.pack('<i',tgt-(nsite+5))+b'\x90'*(L-5)

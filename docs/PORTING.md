@@ -64,7 +64,7 @@ function references. One of them mentions `m_flWaterZ`, the other
 `m_fHeight`; that settles it. A port that picks the wrong one of two
 candidates is worse than one that fails.
 
-## Nine things that will bite
+## Eleven things that will bite
 
 **1. Write the whole field, not the byte difference.** A constant may have
 been changed by an earlier phase of the same project. One site held three
@@ -119,7 +119,50 @@ shift is wrong, and wrong in a way that only shows up at run time.
 or one the vendor accesses through a pointer, cannot be located by looking for
 instructions that reference it. The neighbour rule above is the fallback.
 
-**9. Do not name a module after one in the standard library.** A file called
+**9. A site that "is not stock" may be the same code at a new address.** Before
+a trampoline overwrites a site, the bytes found there are checked against the
+previous build's original. Comparing them *raw* is wrong: when code moves, the
+displacement of every `call rel32`, `jmp rel32` and `lea rcx, [rip + x]` has to
+change, so the same function reads as different bytes. The November 13 port
+failed on two sites whose only difference was one `call` displacement and one
+rip-relative offset.
+
+Compare instruction by instruction instead, and allow a difference only inside
+the fields that are *obliged* to move: the displacement of a rip-relative
+operand and the rel8/rel32 of a relative branch. Everything else must match to
+the byte - above all plain immediates, because `cmp ebx, 0x10000` becoming
+`cmp ebx, 0x20000` is the vendor changing a limit, not code relocating, and
+porting over that blind would silently undo the edit. `code_equiv` in
+`lib/portstub.py` is this comparison.
+
+It is safe to let those fields differ at a trampoline site because the bytes
+are about to be replaced by the jump anyway, and the displaced instructions
+copied into the stub are relocated separately in step 1.
+
+**10. A same-build round trip cannot see a relocation bug.** Re-porting a
+patch onto the very build it was made for is a useful smoke test, and it is
+blind to exactly one class of mistake: every shift is zero, so a reference the
+port forgot to move is still correct. The stub relocator used to move `jmp`
+and `call` exits and nothing else. Seven stubs in the engine also leave through
+a conditional jump (`jl`), and on the November 13 build those seven kept their
+old targets, which by then pointed into the middle of unrelated instructions.
+The game crashed on entering a map, the crash address was not on an
+instruction boundary, and every check that existed at the time was green,
+because they all looked at the unconditional return.
+
+Two things came out of it. The relocator now moves every relative branch that
+leaves an added section, whatever its condition. And a port is no longer
+written out until `lib/verify_refs.py` agrees with it, using only the two
+stock files and nothing the port relied on: each branch leaving a stub must
+land on the same code as it did in the previous build, and the edited
+instructions in `.text` must reference the same stub offsets and the same data.
+Run against the broken engine it reports exactly the seven.
+
+If a patched game crashes at an address that is not an instruction boundary,
+look for a stale branch first: search the image for a relative jump whose
+target is the crash address.
+
+**11. Do not name a module after one in the standard library.** A file called
 `fnmatch.py` in the tool directory shadows Python's own, `shutil` imports it,
 and the analysis script exits silently with no output. An hour went into that.
 
