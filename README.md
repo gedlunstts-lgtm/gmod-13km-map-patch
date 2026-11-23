@@ -1,168 +1,125 @@
 # gmod483k
 
-Raises Garry's Mod's map limits so a map can be about **13 × 13 km** instead of
-the stock 32768 units on a side, and lifts the geometry ceilings a map that
-size runs into.
-The same tool patches Hammer++ and installs the map compilers, so the release is enough both to play a map this size and to build one.
+Big maps for Garry's Mod.
 
-| limit | stock | with this patch |
+Normally a GMod map can't be bigger than about 800 meters across. Go past
+that and things break: you can't spawn stuff, props fall through the floor,
+models start shaking. This patch pushes the edge out to about 13 km, so you
+can build a whole city on one map and drive around it with your friends.
+
+It also raises a few other limits that a map this big runs into, like how
+many static props it can have (16384 before, 524288 now).
+
+## How to install
+
+1. Go to [Releases](../../releases) and download `gmod483k.exe`.
+2. Close Garry's Mod.
+3. Run `gmod483k.exe`. It finds your game by itself, patches it and tells you
+   when it's done.
+
+That's it. You need the 64-bit version of the game (`x86-64` branch in
+Steam's Betas tab).
+
+If something doesn't match, for example your game version is different, the
+patcher won't touch anything and will just tell you.
+
+**Playing together:** everyone on the server needs the patch, otherwise
+you won't be able to join each other.
+
+## How to remove it
+
+Run `gmod483k.exe -restore`, or use "Verify integrity of game files" in
+Steam. Either one gives you the original game back.
+
+## If you want to make maps
+
+You'll need Hammer++ for Garry's Mod, **version 8872**. Get it from the
+[official Hammer++ page](https://github.com/ficool2/HammerPlusPlus-Website/releases/tag/8872)
+(the Garry's Mod archive) and install it into the game like it says there.
+
+Then put `compilers.zip` from our Releases next to `gmod483k.exe` and run the
+patcher. It will fix Hammer++ so it works on big maps and add the map
+compilers that can handle them.
+
+One thing to set by hand: in Hammer++ open **Run Map → Expert** and in the
+first line (the one with `$bsp_exe`) change the parameters to
+
+```
+-blocksize 8192 -game $gamedir $path\$file
+```
+
+Without it, compiling a big map looks like it freezes on "Building Physics
+collision data".
+
+Maps made this way only work in a patched game.
+
+## When Garry's Mod updates
+
+An update puts the original game files back, and the patch won't install
+until it's updated for the new version. Just wait for a new release here.
+
+## Is this legal / safe?
+
+There are no Garry's Mod files in this repository. The patcher only carries
+the small changes we made and applies them to the game you already have.
+Your original files are kept next to the patched ones (`.stock`), so you can
+always go back. You need your own copy of the game.
+
+We are not connected to Facepunch, Valve or the author of Hammer++.
+
+---
+
+## Technical part
+
+### What exactly gets changed
+
+| limit | stock | patched |
 |---|---|---|
 | map coordinate range | ±16384 | ±261120 |
-| network coordinate bits | 14 | 18 |
-| vertex indices per material batch | 65536 | 4194304 |
-| leaf faces | 16-bit | 32-bit, both formats readable |
-| surface edges | 16-bit | 32-bit |
 | static props per map | 16384 | 524288 |
+| vertex indices per material batch | 65536 | 4194304 |
+| leaf faces | 16-bit | 32-bit |
+| surface edges | 16-bit | 32-bit |
+| network coordinate bits | 14 | 18 |
 
-Five files are patched, all under `bin\win64`: `engine.dll`, `client.dll`,
-`server.dll`, `shaderapidx9.dll`, `studiorender.dll`.
+Game files, all in `bin\win64`: `engine.dll`, `client.dll`, `server.dll`,
+`shaderapidx9.dll`, `studiorender.dll`. Hammer++ 8872: `hammerplusplus_dll.dll`
+and the `@mapsize` line in its FGD. Compilers (with `compilers.zip`):
+`vbsp_483k.exe`, `vvis_483k.exe`, `vrad_483k.exe`, built from Valve's Source
+SDK 2013 under its licence, see [compilers/README.md](compilers/README.md).
 
-## This repository contains no Garry's Mod file
+Supported game build: 2026-11-13. Patches are pinned to exact builds by
+SHA-256 of the original and the result.
 
-It contains a patch that lists only the bytes this project changes, a patcher
-that applies it to the files already on your disk, and the tools that produced
-it.
-
-The patch is 56 KB. Every byte in it is this project's own work, and that is
-enforced rather than claimed: the builder ends a recorded range at the first
-byte that matches the original, then asserts per range that none did, so a
-patch which would carry an original byte fails to build. See
-[docs/FORMAT.md](docs/FORMAT.md).
-
-Builds are pinned by SHA-256 of the original and of the result. A hash
-identifies a build without reproducing any of it.
-
-## Using it
-
-Grab `gmod483k.exe` from [Releases](../../releases), close Garry's Mod and
-Hammer, and run it.
+### Patcher options
 
 ```
 gmod483k.exe              install
-gmod483k.exe -verify      report what is currently installed
+gmod483k.exe -verify      show what is installed, change nothing
 gmod483k.exe -restore     put the original files back
-gmod483k.exe -maps        install only the maps, leave the game files alone
-gmod483k.exe -compilers   install only the map compilers
 gmod483k.exe -no-hammer   leave Hammer++ alone
+gmod483k.exe -maps        only copy maps from a maps folder or maps.zip next to the exe
+gmod483k.exe -compilers   only install the compilers
 gmod483k.exe -gmod "D:\SteamLibrary\steamapps\common\GarrysMod"
 ```
 
-Double-clicking it works: the window stays open until you press Enter.
+### Docs
 
-### Maps
+- [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) - the limits and how each one is lifted
+- [docs/PATCH-SITES.md](docs/PATCH-SITES.md) - every patched address
+- [docs/PORTING.md](docs/PORTING.md), [CONTRIBUTING.md](CONTRIBUTING.md) - porting to a new game build
+- [docs/FORMAT.md](docs/FORMAT.md) - the patch file format
 
-If a `maps` folder or a `maps.zip` containing `.bsp` files sits next to the
-patcher, it copies them into the game after patching, skipping any that are
-already there unchanged. Maps are kept beside the patcher rather than inside
-it so that someone who only wants the patch is not made to download tens of
-megabytes of them.
-
-It finds the game through Steam's library list, keeps every original beside
-the patched one as `<name>.stock`, and verifies each file both before and
-after writing. If anything is not the exact supported build it stops and
-writes nothing at all - not even the files that did match.
-
-### Before you install
-
-**Building maps takes two more things, and the patcher handles both.**
-
-*Hammer++.* If it is installed under `bin`, the patcher patches
-`hammerplusplus_dll.dll` and sets `@mapsize` in the Hammer++ FGD, keeping a
-`.stock` copy of each. Stock Hammer++ has the value 99999 built into its
-coordinate handling in over a hundred places, so with a bigger map size and no
-patch the selection box, its handles and its size labels stop appearing once
-you work past that distance. The FGD line alone is not enough - both are
-needed.
-The patcher knows Hammer++ build 8872 and leaves any other build alone,
-printing its hash; `-no-hammer` skips Hammer++ altogether.
-
-*The compilers.* Put `compilers.zip` from the release next to `gmod483k.exe`
-and it installs `vbsp_483k.exe`, `vvis_483k.exe` and `vrad_483k.exe` into
-`bin\win64` and points Hammer++ at them. These are not Garry's Mod files and
-are not byte patches: they are a build of the compilers from Valve's Source
-SDK 2013, distributed under its licence, which is in the archive. See
-[compilers/README.md](compilers/README.md) for what they change and for an
-honest account of how they were made. A map built with them loads only in a
-patched game.
-
-**This patch targets exact game builds.** The patcher carries one patch per
-supported build and picks the one matching your files; if none does, it writes
-nothing and prints the hashes it found. A Garry's Mod update means a port is
-needed - see [CONTRIBUTING.md](CONTRIBUTING.md), which is one command and
-needs nothing but the `.stock` backups the patcher already made. Steam's "verify
-integrity of game files" reverts it too; there you can simply run the patcher
-again.
-
-**Everyone playing together needs it.** The patch changes how coordinates are
-packed on the wire, so a patched client cannot join an unpatched server, or the
-other way round.
-
-You need your own purchased, installed copy of the game. This project is not
-affiliated with Facepunch Studios or Valve.
-
-## What is in here
-
-| path | what it is |
-|---|---|
-| `patcher/` | the patcher, Go, standard library only; `patcher/patches/` holds one `.glp` per supported game build, `patcher/optional/` one per supported Hammer++ build |
-| `compilers/` | what the map compilers are and where they come from; the binaries themselves are a release asset, `compilers.zip` |
-| `lib/` | the toolchain: PE reading and section surgery, masked-signature porting, stub and pointer-table porting, stub auditing, the patch format |
-| `build/` | `report.py` re-ports the patch to a new game build in one command; `make_patch.py` builds the `.glp`; `audit.py` checks every stub returns properly |
-| `docs/` | how it works, the site inventory, the porting playbook, the format spec |
-| `archive/` | the one-off scripts this was actually worked out with, unmaintained |
-
-## Documentation
-
-- **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)** - which limits exist, what
-  each module contributes, and the three mechanisms the patch uses
-- **[docs/PORTING.md](docs/PORTING.md)** - how to re-port after a game update,
-  and nine mistakes that cost real time
-- **[docs/PATCH-SITES.md](docs/PATCH-SITES.md)** - every patched address and
-  what is written there
-- **[docs/FORMAT.md](docs/FORMAT.md)** - the GLP1 patch format
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - how to re-port after a game update,
-  which is the job that recurs
-
-## Building
-
-The patcher:
+### Building
 
 ```
 cd patcher
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../gmod483k.exe .
 ```
 
-The patch, from your own copies of the stock and patched files:
-
-```
-cp build/config.example.json config.json   # point it at your files
-python3 build/make_patch.py config.json patcher/patches/<date>.glp
-```
-
-Re-porting to the build you have installed, from the `.stock` backups the
-patcher saved:
-
-```
-python3 build/report.py --patch patcher/patches/<newest>.glp --gmod "<game folder>" --out out
-```
-
-`make_patch.py` applies the patch back to the stock files and compares hashes,
-so a build that does not round-trip is a build that failed. The tools need
-Python 3 and [capstone](https://www.capstone-engine.org/) (`pip install
-capstone`).
-
-Reproducing the patch needs the stock and patched files for the build in
-question. Re-porting to a new build additionally needs the previous build's
-files, unpatched and patched, as the reference - see the porting document.
-
-## Why a patch and not the files
-
-Shipping the patched DLLs would mean shipping Facepunch's and Valve's code.
-Shipping a list of only the bytes this project changed does not: there is no
-original code in it, and it does nothing without a legitimate installation to
-apply it to. Game modifications have been distributed as patches rather than
-copies for decades, for exactly this reason.
+The Python tools in `build/` and `lib/` need Python 3 and
+[capstone](https://www.capstone-engine.org/).
 
 ## Licence
 
-MIT, covering everything in this repository. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
