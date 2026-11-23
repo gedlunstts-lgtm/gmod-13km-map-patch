@@ -17,11 +17,21 @@ What that takes, per module:
 
 | module | what changes |
 |---|---|
-| `engine.dll` | coordinate bit widths, the world bounds array, the extent check, the lightmap and surface loaders, the max-coordinate constants |
+| `engine.dll` | coordinate bit widths, the world bounds array, the extent check, the lightmap and surface loaders, the max-coordinate constants, and the depth pre-pass, which is always skipped (see below) |
 | `server.dll` | the same bit widths, plus the min/max bounds and bit counts of every networked coordinate property |
 | `client.dll` | the matching bit widths, so client and server agree on the wire |
 | `shaderapidx9.dll` | draws relative to the camera instead of the world origin, which is what removes the floating-point shimmer at distance |
 | `studiorender.dll` | re-applies the camera offset for model eyes, which the change above otherwise leaves pointing the wrong way |
+
+**The depth pre-pass is switched off.** With `r_fastzreject` on - and the
+game turns it on by itself for many graphics cards - the engine first draws
+the world into the depth buffer alone and then draws it again for real,
+expecting both passes to land on exactly the same depth. On a map this size
+they do not: polygons fight themselves and flicker in and out as the camera
+moves. One byte in `engine.dll` turns the `je` that guards the pre-pass into a
+`jmp`, so the pre-pass never runs whatever the variable says. Typing
+`r_fastzreject 0` in the console has the same effect on an unpatched engine,
+which is how to tell this problem from any other.
 
 The last two depend on each other and know it. `studiorender` looks up
 `shaderapidx9` at run time, checks for a magic string at a fixed offset in a
@@ -40,6 +50,7 @@ BSP format long before it runs out of coordinate range:
 | vertex indices per material batch | 65536 | 4194304 |
 | leaf faces | 16-bit indices | 32-bit |
 | surface edges | 16-bit | 32-bit |
+| static props | 16384 | 524288 |
 
 The leaf-face change is the interesting one, because it has to stay backward
 compatible: every stock map in the game uses the 16-bit format. The lump
@@ -47,6 +58,31 @@ header carries a version field, so the loader branches on it - version 1 reads
 32-bit indices, anything else reads 16-bit. Both formats load in the same
 session. Without that, every stock map fails with `Mod_LoadMarksurfaces: funny
 lump size`.
+
+## Static props
+
+A city this size needs far more than 16384 static props, and stock
+`engine.dll` quietly drops everything past that number while loading the map.
+The physics side still sees every prop, so the two disagree: objects hover
+over props that are not drawn, or fall through ones that are.
+
+Raising the number alone is not enough. The engine packs a static prop's
+index into a 14-bit field of an entity handle, with bit 30 marking "this is a
+static prop". So the patch also
+
+- raises the load clamp from 16384 to 524288 (both the comparison and the
+  value it clamps to),
+- widens the five places that unpack the index from `& 0x3fff` to
+  `& 0x3fffffff`,
+- changes the "is this a static prop" test from `(h & 0xffffc000) ==
+  0x40000000` to `(h & 0xc0000000) == 0x40000000` - with the old mask, a prop
+  numbered above 16383 stops being recognised as a prop and the game crashes,
+- turns the "bad static prop handle" warning's conditional jump into a plain
+  jump, since an index above 16383 is now legitimate.
+
+All of these are constant or one-byte changes; nothing is moved or added.
+The map compilers already write static prop lumps of any size, so existing
+maps need no rebuild.
 
 ## How the changes are made
 

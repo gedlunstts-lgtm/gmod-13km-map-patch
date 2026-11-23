@@ -2,6 +2,13 @@
 
 Generated from the shipped patch, for game build `2026-11-04`.
 
+The `2026-11-13` build adds, in `engine.dll`, the one-byte depth pre-pass
+fix and the static prop changes described in
+[HOW-IT-WORKS.md](HOW-IT-WORKS.md#static-props): the load clamp
+(`cmp r15d, 0x80000` and `mov r15d, 0x80000`), five index masks
+(`and ..., 0x3fffffff`), the static prop test (`and ecx, 0xc0000000`) and the
+handle warning's `jne` turned into `jmp`.
+
 Each row gives an address in the module, at its preferred load base, and the
 instruction or value **this project writes there**. What the game shipped at
 that address is deliberately not reproduced, for the same reason it is not in

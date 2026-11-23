@@ -81,6 +81,14 @@ project that cost one entire debugging session: the earlier pass had *disabled*
 the map extent check by replacing a conditional jump with two `nop`s, and the
 later pass had no reason to touch it again.
 
+The reference itself can be a layer short. The depth pre-pass edit (one byte,
+see HOW-IT-WORKS) was made in a later engine than the one the November ports
+took as their reference, so both ports shipped without it and nobody noticed:
+the machine they were tested on had `r_fastzreject 0` in its `autoexec.cfg`
+from an old installer. A port reproduces the reference it is given, so check
+the reference against the written list of what the patch is supposed to do,
+and test on a machine that has never had any of this installed.
+
 **3. Mark added sections writable if a stub writes to them.** A stub that
 stores a flag in its own section faults instantly on a read-only page. There
 is no console output, no crash dialog - the game vanishes mid-load. The symptom

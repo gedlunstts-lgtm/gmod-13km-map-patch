@@ -24,13 +24,14 @@ import (
 //go:embed patches/*.glp
 var patchFS embed.FS
 
-const version = "1.4"
+const version = "1.5"
 
 type state int
 
 const (
 	stStock state = iota
 	stPatched
+	stOlder // not the current patch, but its saved original is this build's
 	stUnknown
 	stMissing
 )
@@ -41,6 +42,8 @@ func (s state) String() string {
 		return "stock"
 	case stPatched:
 		return "patched"
+	case stOlder:
+		return "earlier patch"
 	case stMissing:
 		return "MISSING"
 	}
@@ -108,6 +111,13 @@ func classify(root string, p *Patch) []item {
 			it.st = stPatched
 		default:
 			it.st = stUnknown
+			// A file left by an earlier version of this patch is not stock
+			// and not the current result, but if the original saved beside
+			// it is this build's, the current patch can be built from that.
+			if b, err := os.ReadFile(it.bak); err == nil && hashOf(b) == t.OldHash {
+				it.st = stOlder
+				it.bytes = b
+			}
 		}
 		items = append(items, it)
 	}
@@ -121,7 +131,7 @@ func pick(root string, rels []release) (*release, []item, bool) {
 		items := classify(root, rels[i].patch)
 		ok := true
 		for _, it := range items {
-			if it.st != stStock && it.st != stPatched {
+			if it.st != stStock && it.st != stPatched && it.st != stOlder {
 				ok = false
 				break
 			}
@@ -271,7 +281,11 @@ func install(items []item) int {
 			fmt.Printf("  %-22s written, but reading it back does not match. Run -restore.\n", name)
 			return 1
 		}
-		fmt.Printf("  %-22s patched, original kept as %s\n", name, filepath.Base(it.bak))
+		if it.st == stOlder {
+			fmt.Printf("  %-22s updated from an earlier version of the patch\n", name)
+		} else {
+			fmt.Printf("  %-22s patched, original kept as %s\n", name, filepath.Base(it.bak))
+		}
 		done++
 	}
 	fmt.Println()
@@ -358,6 +372,8 @@ func run() int {
 		doList   = flag.Bool("list", false, "list the game builds this patcher has a patch for")
 		showVer  = flag.Bool("version", false, "print version and exit")
 		onlyMaps = flag.Bool("maps", false, "only install the maps found next to the patcher, do not touch the game files")
+		noExtra  = flag.Bool("no-hammer", false, "leave Hammer++ alone")
+		onlyComp = flag.Bool("compilers", false, "only install the map compilers found next to the patcher")
 	)
 	flag.Parse()
 
@@ -413,10 +429,42 @@ func run() int {
 		return installMaps(root, maps, mapsFrom)
 	}
 
+	tools, toolsFrom := findCompilers()
+	if *onlyComp {
+		if len(tools) == 0 {
+			fmt.Println()
+			fmt.Println("No compilers found next to the patcher. Put 'compilers.zip' from the")
+			fmt.Println("release in the same directory as this program, then run it again.")
+			return 1
+		}
+		fmt.Println()
+		return installCompilers(root, tools, toolsFrom)
+	}
+
+	// Hammer++ does not depend on the game build, so it is handled whether
+	// or not the game patch applies.
+	extra := func(mode string) {
+		if !*noExtra {
+			optional(root, mode)
+		}
+	}
+	mode := "install"
+	switch {
+	case *doVer:
+		mode = "verify"
+	case *doRest:
+		mode = "restore"
+	}
+
 	rel, items, ok := pick(root, rels)
 	if !ok {
 		report(items)
 		explainUnsupported(root, rels, items)
+		extra(mode)
+		if mode == "install" && len(tools) > 0 {
+			fmt.Println()
+			installCompilers(root, tools, toolsFrom)
+		}
 		return 1
 	}
 	fmt.Println("patch:", rel.patch.Note)
@@ -424,16 +472,21 @@ func run() int {
 
 	switch {
 	case *doVer:
-		patched, stock := 0, 0
+		patched, stock, older := 0, 0, 0
 		for _, it := range items {
 			switch it.st {
 			case stPatched:
 				patched++
 			case stStock:
 				stock++
+			case stOlder:
+				older++
 			}
 		}
 		switch {
+		case older > 0 && older+patched == len(items):
+			fmt.Println("An earlier version of the patch is installed. Run the patcher with no")
+			fmt.Println("arguments to bring it up to date.")
 		case patched == len(items):
 			fmt.Println("The patch is fully installed.")
 		case stock == len(items):
@@ -441,11 +494,21 @@ func run() int {
 		default:
 			fmt.Println("Mixed state. Run -restore, then install again.")
 		}
+		extra(mode)
 	case *doRest:
-		return restore(items)
+		code := restore(items)
+		extra(mode)
+		return code
 	default:
 		if code := install(items); code != 0 {
 			return code
+		}
+		extra(mode)
+		if len(tools) > 0 {
+			fmt.Println()
+			if code := installCompilers(root, tools, toolsFrom); code != 0 {
+				return code
+			}
 		}
 		if len(maps) > 0 {
 			fmt.Println()

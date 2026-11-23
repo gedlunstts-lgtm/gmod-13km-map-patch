@@ -3,7 +3,7 @@
 Raises Garry's Mod's map limits so a map can be about **13 × 13 km** instead of
 the stock 32768 units on a side, and lifts the geometry ceilings a map that
 size runs into.
-Rn there are no compilers because i need time to create byte to byte patch of hammer++ and compiler dll files
+The same tool patches Hammer++ and installs the map compilers, so the release is enough both to play a map this size and to build one.
 
 | limit | stock | with this patch |
 |---|---|---|
@@ -12,6 +12,7 @@ Rn there are no compilers because i need time to create byte to byte patch of ha
 | vertex indices per material batch | 65536 | 4194304 |
 | leaf faces | 16-bit | 32-bit, both formats readable |
 | surface edges | 16-bit | 32-bit |
+| static props per map | 16384 | 524288 |
 
 Five files are patched, all under `bin\win64`: `engine.dll`, `client.dll`,
 `server.dll`, `shaderapidx9.dll`, `studiorender.dll`.
@@ -41,6 +42,8 @@ gmod483k.exe              install
 gmod483k.exe -verify      report what is currently installed
 gmod483k.exe -restore     put the original files back
 gmod483k.exe -maps        install only the maps, leave the game files alone
+gmod483k.exe -compilers   install only the map compilers
+gmod483k.exe -no-hammer   leave Hammer++ alone
 gmod483k.exe -gmod "D:\SteamLibrary\steamapps\common\GarrysMod"
 ```
 
@@ -61,11 +64,26 @@ writes nothing at all - not even the files that did match.
 
 ### Before you install
 
-**This lets you play large maps, not build them.** The map compilers and
-Hammer++ need their own byte-level patches, and those are not done yet — the
-compilers currently in use are built on a third-party binary rather than on
-the game's own files, which is not something that can be distributed the way
-this patch is. That work is planned.
+**Building maps takes two more things, and the patcher handles both.**
+
+*Hammer++.* If it is installed under `bin`, the patcher patches
+`hammerplusplus_dll.dll` and sets `@mapsize` in the Hammer++ FGD, keeping a
+`.stock` copy of each. Stock Hammer++ has the value 99999 built into its
+coordinate handling in over a hundred places, so with a bigger map size and no
+patch the selection box, its handles and its size labels stop appearing once
+you work past that distance. The FGD line alone is not enough - both are
+needed.
+The patcher knows Hammer++ build 8872 and leaves any other build alone,
+printing its hash; `-no-hammer` skips Hammer++ altogether.
+
+*The compilers.* Put `compilers.zip` from the release next to `gmod483k.exe`
+and it installs `vbsp_483k.exe`, `vvis_483k.exe` and `vrad_483k.exe` into
+`bin\win64` and points Hammer++ at them. These are not Garry's Mod files and
+are not byte patches: they are a build of the compilers from Valve's Source
+SDK 2013, distributed under its licence, which is in the archive. See
+[compilers/README.md](compilers/README.md) for what they change and for an
+honest account of how they were made. A map built with them loads only in a
+patched game.
 
 **This patch targets exact game builds.** The patcher carries one patch per
 supported build and picks the one matching your files; if none does, it writes
@@ -79,9 +97,6 @@ again.
 packed on the wire, so a patched client cannot join an unpatched server, or the
 other way round.
 
-**This lets you play large maps, not build them.** The map compilers and
-Hammer need their own patches, which are not done yet.
-
 You need your own purchased, installed copy of the game. This project is not
 affiliated with Facepunch Studios or Valve.
 
@@ -89,7 +104,8 @@ affiliated with Facepunch Studios or Valve.
 
 | path | what it is |
 |---|---|
-| `patcher/` | the patcher, Go, standard library only; `patcher/patches/` holds one `.glp` per supported game build |
+| `patcher/` | the patcher, Go, standard library only; `patcher/patches/` holds one `.glp` per supported game build, `patcher/optional/` one per supported Hammer++ build |
+| `compilers/` | what the map compilers are and where they come from; the binaries themselves are a release asset, `compilers.zip` |
 | `lib/` | the toolchain: PE reading and section surgery, masked-signature porting, stub and pointer-table porting, stub auditing, the patch format |
 | `build/` | `report.py` re-ports the patch to a new game build in one command; `make_patch.py` builds the `.glp`; `audit.py` checks every stub returns properly |
 | `docs/` | how it works, the site inventory, the porting playbook, the format spec |
