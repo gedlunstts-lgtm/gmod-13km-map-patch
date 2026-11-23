@@ -12,6 +12,13 @@ handle warning's `jne` turned into `jmp`.
 Since 1.5.1, `shaderapidx9.dll` also has a 5-byte `jmp` at the start of the
 camera-offset routine in `.ctext` and a short check after the existing code
 that keeps the offset at zero outside the game (Hammer++, model viewers).
+Since 1.5.2, `engine.dll` also fixes the collision loader for displacements
+(`CollisionBSPData_LoadDispInfo`, build 2026-11-13 at `0x1801804c0`). It read
+the edge lump as 16-bit `dedge_t` even when the map carries the 32-bit
+version 1 lump that `vbsp_483k` writes. A jump at `0x1801805c1` goes to a stub
+that widens a version 0 lump into a 32-bit copy (freed by a second stub hooked
+at `0x180181054`), and the five edge reads use an 8-byte stride and `dword`
+loads.
 
 Each row gives an address in the module, at its preferred load base, and the
 instruction or value **this project writes there**. What the game shipped at

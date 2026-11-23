@@ -68,6 +68,14 @@ header carries a version field, so the loader branches on it - version 1 reads
 session. Without that, every stock map fails with `Mod_LoadMarksurfaces: funny
 lump size`.
 
+Edges work the same way: `vbsp_483k` writes them with 32-bit vertex indices
+under lump version 1. The engine reads edges in two places - once for the
+drawn world and once for displacement collision - and both must branch on the
+version. Until 1.5.2 only the first did, so on maps built with `vbsp_483k`
+displacements got their collision from the wrong corners. Since the engine also
+uses that collision to decide which parts of the map a displacement is visible
+from, they looked skewed and popped in and out depending on where you stood.
+
 ## Static props
 
 A city this size needs far more than 16384 static props, and stock
