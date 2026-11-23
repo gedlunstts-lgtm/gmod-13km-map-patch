@@ -33,9 +33,11 @@ Steam. Either one gives you the original game back.
 
 ## If you want to make maps
 
-You'll need Hammer++ for Garry's Mod, **version 8872**. Get it from the
-[official Hammer++ page](https://github.com/ficool2/HammerPlusPlus-Website/releases/tag/8872)
+You'll need Hammer++ for Garry's Mod, **version 8873**. Get it from the
+[official Hammer++ page](https://github.com/ficool2/HammerPlusPlus-Website/releases)
 (the Garry's Mod archive) and install it into the game like it says there.
+Version 8872 is also supported, but on the current Garry's Mod its model
+browser turns every window black, so use 8873.
 
 Then put `compilers.zip` from our Releases next to `gmod483k.exe` and run the
 patcher. It will fix Hammer++ so it works on big maps and add the map
@@ -83,7 +85,7 @@ We are not connected to Facepunch, Valve or the author of Hammer++.
 | network coordinate bits | 14 | 18 |
 
 Game files, all in `bin\win64`: `engine.dll`, `client.dll`, `server.dll`,
-`shaderapidx9.dll`, `studiorender.dll`. Hammer++ 8872: `hammerplusplus_dll.dll`
+`shaderapidx9.dll`, `studiorender.dll`. Hammer++ 8873 or 8872: `hammerplusplus_dll.dll`
 and the `@mapsize` line in its FGD. Compilers (with `compilers.zip`):
 `vbsp_483k.exe`, `vvis_483k.exe`, `vrad_483k.exe`, built from Valve's Source
 SDK 2013 under its licence, see [compilers/README.md](compilers/README.md).
