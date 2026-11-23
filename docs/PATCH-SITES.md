@@ -9,6 +9,10 @@ fix and the static prop changes described in
 (`and ..., 0x3fffffff`), the static prop test (`and ecx, 0xc0000000`) and the
 handle warning's `jne` turned into `jmp`.
 
+Since 1.5.1, `shaderapidx9.dll` also has a 5-byte `jmp` at the start of the
+camera-offset routine in `.ctext` and a short check after the existing code
+that keeps the offset at zero outside the game (Hammer++, model viewers).
+
 Each row gives an address in the module, at its preferred load base, and the
 instruction or value **this project writes there**. What the game shipped at
 that address is deliberately not reproduced, for the same reason it is not in

@@ -24,7 +24,7 @@ import (
 //go:embed patches/*.glp
 var patchFS embed.FS
 
-const version = "1.5"
+const version = "1.5.1"
 
 type state int
 

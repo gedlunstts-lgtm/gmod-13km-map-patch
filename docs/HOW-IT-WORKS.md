@@ -40,6 +40,15 @@ there - a mismatched pair, a partial install - it disables its own hook
 instead of crashing. That handshake is why a half-installed patch shows up as
 models looking the wrong way rather than as a crash.
 
+The camera offset is switched on only inside the game. Hammer++ and the
+model viewers load the same `shaderapidx9.dll` from `bin/win64`, and their 2D
+views and model previews draw partly through paths the offset does not
+reach, so selection handles and the world border drifted away from what they
+belong to - and only now and then, because the offset moves in grid steps.
+The first time the offset is computed, the patch asks Windows which modules
+are loaded: with `engine.dll` present and no Hammer DLL it works as before,
+otherwise the offset stays at zero, which draws exactly like the stock file.
+
 ## The geometry ceiling
 
 Independently of coordinates, a map that *fills* 13 km runs out of room in the
