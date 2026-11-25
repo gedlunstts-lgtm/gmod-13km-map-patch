@@ -2,6 +2,8 @@
 
 Big maps for Garry's Mod.
 
+tg channel: https://t.me/aviantproject
+
 Normally a GMod map can't be bigger than about 800 meters across. Go past
 that and things break: you can't spawn stuff, props fall through the floor,
 models start shaking. This patch pushes the edge out to about 13 km, so you
