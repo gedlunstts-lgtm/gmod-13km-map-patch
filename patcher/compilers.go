@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -146,85 +145,6 @@ func samePath(a, b string) bool {
 	return norm(a) == norm(b)
 }
 
-var reConfigLine = regexp.MustCompile(`^(\s*"([^"]+)"\s+)"([^"]*)"(\s*)$`)
-
-// pointHammer rewrites the BSP/Vis/Light entries of the Hammer++ game
-// configuration that belongs to this game folder. Other games configured in
-// the same file are left exactly as they are.
-func pointHammer(root string, exes map[string]string) {
-	gameDir := filepath.Join(root, "garrysmod")
-	found := false
-	for _, cfg := range findByName(root, hammerConfig) {
-		found = true
-		b, err := os.ReadFile(cfg)
-		if err != nil {
-			continue
-		}
-		nl := "\n"
-		if strings.Contains(string(b), "\r\n") {
-			nl = "\r\n"
-		}
-		lines := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
-		ours, changed, seen := false, 0, 0
-		for i, ln := range lines {
-			m := reConfigLine.FindStringSubmatch(ln)
-			if m == nil {
-				continue
-			}
-			if strings.EqualFold(m[2], "GameDir") {
-				ours = samePath(m[3], gameDir)
-				continue
-			}
-			if !ours {
-				continue
-			}
-			for _, hk := range hammerKeys {
-				if !strings.EqualFold(m[2], hk.key) {
-					continue
-				}
-				want, ok := exes[hk.prefix]
-				if !ok {
-					continue
-				}
-				seen++
-				if !samePath(m[3], want) {
-					lines[i] = m[1] + `"` + want + `"` + m[4]
-					changed++
-				}
-			}
-		}
-		name := filepath.Base(cfg)
-		switch {
-		case seen == 0:
-			fmt.Printf("  %-26s has no entry for this game folder, left alone\n", name)
-		case changed == 0:
-			fmt.Printf("  %-26s already points at these compilers\n", name)
-		default:
-			if _, err := os.Stat(cfg + ".stock"); os.IsNotExist(err) {
-				if err := writeFile(cfg+".stock", b); err != nil {
-					fmt.Printf("  %-26s could not save the backup: %v\n", name, err)
-					continue
-				}
-			}
-			if err := writeFile(cfg, []byte(strings.Join(lines, nl))); err != nil {
-				fmt.Printf("  %-26s could not write: %v\n", name, err)
-				continue
-			}
-			fmt.Printf("  %-26s build programs set, previous copy kept as %s.stock\n", name, name)
-		}
-	}
-	if !found {
-		fmt.Println()
-		fmt.Println("Hammer++ has no game configuration yet. Once it has one, set these under")
-		fmt.Println("Tools > Options > Build Programs:")
-		for _, hk := range hammerKeys {
-			if p, ok := exes[hk.prefix]; ok {
-				fmt.Printf("  %-6s %s\n", hk.key+":", p)
-			}
-		}
-	}
-}
-
 func installCompilers(root string, srcs []toolSrc, from string) int {
 	bin := filepath.Join(root, "bin", "win64")
 	if _, err := os.Stat(bin); err != nil {
@@ -262,7 +182,7 @@ func installCompilers(root string, srcs []toolSrc, from string) int {
 			launcher = target
 		}
 	}
-	pointHammer(root, exes)
+	fixHammerConfig(root, exes)
 	fmt.Println()
 	fmt.Println("The compilers are built from Valve's Source SDK 2013; its licence is in the")
 	fmt.Println("archive they came in.")

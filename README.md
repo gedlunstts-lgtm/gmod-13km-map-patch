@@ -2,8 +2,6 @@
 
 Big maps for Garry's Mod.
 
-tg channel: https://t.me/aviantproject
-
 Normally a GMod map can't be bigger than about 800 meters across. Go past
 that and things break: you can't spawn stuff, props fall through the floor,
 models start shaking. This patch pushes the edge out to about 13 km, so you
@@ -42,18 +40,12 @@ Version 8872 is also supported, but on the current Garry's Mod its model
 browser turns every window black, so use 8873.
 
 Then put `compilers.zip` from our Releases next to `gmod483k.exe` and run the
-patcher. It will fix Hammer++ so it works on big maps and add the map
-compilers that can handle them.
-
-One thing to set by hand: in Hammer++ open **Run Map → Expert** and in the
-first line (the one with `$bsp_exe`) change the parameters to
-
-```
--blocksize 8192 -game $gamedir $path\$file
-```
-
-Without it, compiling a big map looks like it freezes on "Building Physics
-collision data".
+patcher. It will fix Hammer++ so it works on big maps, add the map compilers
+that can handle them, and set Hammer++ up for your game folder: where the game
+and its `gameinfo.txt` are, which compilers to run, and the `-blocksize 8192`
+option the compiler needs on big maps. Nothing to set by hand. Run the patcher
+again after you reinstall Hammer++ or move the game. Close Hammer++ before
+you run it.
 
 Maps made this way only work in a patched game.
 
@@ -83,6 +75,7 @@ We are not connected to Facepunch, Valve or the author of Hammer++.
 | static props per map | 16384 | 524288 |
 | vertex indices per material batch | 65536 | 4194304 |
 | leaf faces | 16-bit | 32-bit |
+| node first-face index | 16-bit | 32-bit |
 | surface edges | 16-bit | 32-bit |
 | network coordinate bits | 14 | 18 |
 

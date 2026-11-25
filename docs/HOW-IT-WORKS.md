@@ -76,6 +76,16 @@ displacements got their collision from the wrong corners. Since the engine also
 uses that collision to decide which parts of the map a displacement is visible
 from, they looked skewed and popped in and out depending on where you stood.
 
+The same lesson, three more times, fixed in 1.5.5: every place that reads one
+of the widened numbers has to be found, and a reader that is missed only shows
+up on a map big enough to cross 65 536. The flashlight shadow pass read vertex
+indices as 16-bit (phantom shadows), the leaf list rebuild at load time kept
+only the low half of a leaf's first face (invisible rows of brushes), and node
+faces had no high half at all, in the file or in memory (black walls on maps
+with more than 65 536 faces). `vbsp_483k` now writes that high half into the
+node's padding field and the engine reads it; on maps without it the field is
+zero and nothing changes.
+
 ## Static props
 
 A city this size needs far more than 16384 static props, and stock

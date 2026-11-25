@@ -19,6 +19,29 @@ version 1 lump that `vbsp_483k` writes. A jump at `0x1801805c1` goes to a stub
 that widens a version 0 lump into a 32-bit copy (freed by a second stub hooked
 at `0x180181054`), and the five edge reads use an 8-byte stride and `dword`
 loads.
+Since 1.5.5 (game build 2026-11-13, patch file `2026-11-25.glp`), `engine.dll`
+also finishes the 32-bit face indices it was missing in three places:
+
+- The world depth pass used for flashlight / projected-texture shadows
+  (`0x1800f8950`, the batch builder behind `Shader_WorldShadowDepthFill` and
+  the z pre-pass) still walked `vertindices` as 16-bit on surfaces without
+  primitives: the pointer at `0x1800f8a1a` now uses a 4-byte stride and the
+  eleven reads after it are `dword`. Same for the surface vertex projector at
+  `0x1800c9200` (shadow and flashlight decals on world surfaces). Before, the
+  shadow map got triangles made of random world vertices - large hard-edged
+  phantom shadows from lamps and headlights, on any map.
+- A leaf's first-face index is kept as a low word at `mleaf+0x44` and a high
+  word at `mleaf+0x4a`. `Mod_LoadMarksurfaces` (`0x180117c70`, `0x180117cac`)
+  rebuilds every leaf's list at load and read and wrote only the low word, and
+  four readers (`0x1800ef6b2`, `0x1800ef992`, `0x18011542c`, `0x18012f931`) did
+  the same. Leaves whose list starts past entry 65 535 drew another leaf's
+  faces: whole rows of detail brushes were invisible but solid.
+- A node's first-face index gets a high word too, at `mnode+0x5c`, loaded from
+  the spare `dnode_t` padding (`+0x1e`) that `vbsp_483k` now fills. Hooks at
+  `0x180117eee` (loader) and the six readers `0x1800e38aa`, `0x1800e414c`,
+  `0x1800ea0f3`, `0x180130184`, `0x1800f03eb`, `0x1800f0882`. On a map with
+  more than 65 536 faces the node faces - usually walls, floor and sky - were
+  otherwise black. Maps compiled before need compiling again.
 
 Each row gives an address in the module, at its preferred load base, and the
 instruction or value **this project writes there**. What the game shipped at

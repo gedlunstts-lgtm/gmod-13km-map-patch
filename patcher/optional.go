@@ -280,5 +280,8 @@ func optional(root, mode string) {
 		if patched {
 			setMapsize(root)
 		}
+		fixHammerConfig(root, nil)
+		fixSequences(root)
+		warnVproject()
 	}
 }
